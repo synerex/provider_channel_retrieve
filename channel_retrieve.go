@@ -238,13 +238,13 @@ func main() {
 	argJson := fmt.Sprintf("{ChannelRetrieve[%d]}", *channel)
 	pc_client := sxutil.NewSXServiceClient(client, uint32(*channel), argJson)
 
-	if *all { // send all file
-		sendAllStoredFile(pc_client)
-	} else if *dir != "" {
-	} else if *sendfile != "" {
+	if *sendfile != "" {
 		//		for { // infinite loop..
 		sendingStoredFile(pc_client)
 		//		}
+	} else if *all { // send all file
+		sendAllStoredFile(pc_client)
+	} else if *dir != "" {
 	}
 
 	//	wg.Wait()
