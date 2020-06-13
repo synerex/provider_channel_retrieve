@@ -26,7 +26,7 @@ type DataStore interface {
 
 var (
 	nodesrv   = flag.String("nodesrv", "127.0.0.1:9990", "Node ID Server")
-	channel   = flag.Int("channel", 3, "Retrieving channel type")
+	channel   = flag.String("channel", "3", "Retrieving channel type")
 	local     = flag.String("local", "", "Specify Local Synerex Server")
 	sendfile  = flag.String("sendfile", "", "Sending file name") // only one file
 	startDate = flag.String("startDate", "02-07", "Specify Start Date")
@@ -68,7 +68,7 @@ func getMonthDate(dt string) (month int, date int) {
 }
 
 // sending People Counter File.
-func sendingStoredFile(client *sxutil.SXServiceClient) {
+func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 	// file
 	fp, err := os.Open(*sendfile)
 	if err != nil {
@@ -129,13 +129,18 @@ func sendingStoredFile(client *sxutil.SXServiceClient) {
 				JSON:  token[6],
 				Cdata: &cont,
 			}
-			_, nerr := client.NotifySupply(&smo)
-			if nerr != nil {
-				log.Printf("Send Fail!\n", nerr)
-			} else {
-				//				log.Printf("Sent OK! %#v\n", smo)
-				log.Printf("ts:%s,chan:%s,%s,%s,%s,len:%d", token[0], token[4], token[5], token[6], token[7], len(token[8]))
+			// if channel in channels
+			chnum, err := strconv.Atoi(token[4])
+			client, ok := clients[uint32(chnum)]
+			if ok && err != nil { // if there is channel
+				_, nerr := client.NotifySupply(&smo)
+				if nerr != nil {
+					log.Printf("Send Fail!%v", nerr)
+				} else {
+					//				log.Printf("Sent OK! %#v\n", smo)
+					log.Printf("ts:%s,chan:%s,%s,%s,%s,len:%d", token[0], token[4], token[5], token[6], token[7], len(token[8]))
 
+				}
 			}
 			if *speed < 0 { // sleep for each packet
 				time.Sleep(time.Duration(-*speed) * time.Millisecond)
@@ -158,7 +163,7 @@ func sendingStoredFile(client *sxutil.SXServiceClient) {
 
 }
 
-func sendAllStoredFile(client *sxutil.SXServiceClient) {
+func sendAllStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 	// check all files in dir.
 	stMonth, stDate := getMonthDate(*startDate)
 	edMonth, edDate := getMonthDate(*endDate)
@@ -200,7 +205,7 @@ func sendAllStoredFile(client *sxutil.SXServiceClient) {
 
 		log.Printf("Sending %s", dfile)
 		sendfile = &dfile
-		sendingStoredFile(client)
+		sendingStoredFile(clients)
 	}
 
 }
@@ -213,7 +218,18 @@ func main() {
 	go sxutil.HandleSigInt()
 	sxutil.RegisterDeferFunction(sxutil.UnRegisterNode)
 
-	channelTypes := []uint32{uint32(*channel)}
+	// check channel types.
+	//
+	channelTypes := []uint32{}
+	chans := strings.Split(*channel, ",")
+	for _, ch := range chans {
+		v, err := strconv.Atoi(ch)
+		if err == nil {
+			channelTypes = append(channelTypes, uint32(v))
+		} else {
+			log.Fatal("Can't convert channels %s", *channel)
+		}
+	}
 
 	srv, rerr := sxutil.RegisterNode(*nodesrv, fmt.Sprintf("ChannelRetrieve[%d]", *channel), channelTypes, nil)
 
@@ -235,15 +251,20 @@ func main() {
 		log.Print("Connecting SynerexServer")
 	}
 
-	argJson := fmt.Sprintf("{ChannelRetrieve[%d]}", *channel)
-	pc_client := sxutil.NewSXServiceClient(client, uint32(*channel), argJson)
+	// we need to add clients for each channel:
+	pcClients := map[uint32]*sxutil.SXServiceClient{}
+
+	for _, chnum := range channelTypes {
+		argJson := fmt.Sprintf("{ChannelRetrieve[%d]}", chnum)
+		pcClients[chnum] = sxutil.NewSXServiceClient(client, chnum, argJson)
+	}
 
 	if *sendfile != "" {
 		//		for { // infinite loop..
-		sendingStoredFile(pc_client)
+		sendingStoredFile(pcClients)
 		//		}
 	} else if *all { // send all file
-		sendAllStoredFile(pc_client)
+		sendAllStoredFile(pcClients)
 	} else if *dir != "" {
 	}
 
