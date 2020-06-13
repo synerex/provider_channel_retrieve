@@ -26,7 +26,7 @@ type DataStore interface {
 
 var (
 	nodesrv   = flag.String("nodesrv", "127.0.0.1:9990", "Node ID Server")
-	channel   = flag.String("channel", "3", "Retrieving channel type")
+	channel   = flag.String("channel", "3", "Retrieving channel type(default 3, support comma separated)")
 	local     = flag.String("local", "", "Specify Local Synerex Server")
 	sendfile  = flag.String("sendfile", "", "Sending file name") // only one file
 	startDate = flag.String("startDate", "02-07", "Specify Start Date")
@@ -227,11 +227,11 @@ func main() {
 		if err == nil {
 			channelTypes = append(channelTypes, uint32(v))
 		} else {
-			log.Fatal("Can't convert channels %s", *channel)
+			log.Fatal("Can't convert channels ", *channel)
 		}
 	}
 
-	srv, rerr := sxutil.RegisterNode(*nodesrv, fmt.Sprintf("ChannelRetrieve[%d]", *channel), channelTypes, nil)
+	srv, rerr := sxutil.RegisterNode(*nodesrv, fmt.Sprintf("ChannelRetrieve[%s]", *channel), channelTypes, nil)
 
 	if rerr != nil {
 		log.Fatal("Can't register node:", rerr)
