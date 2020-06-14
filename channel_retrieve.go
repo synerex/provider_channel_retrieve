@@ -132,7 +132,7 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 			// if channel in channels
 			chnum, err := strconv.Atoi(token[4])
 			client, ok := clients[uint32(chnum)]
-			if ok && err != nil { // if there is channel
+			if ok && err == nil { // if there is channel
 				_, nerr := client.NotifySupply(&smo)
 				if nerr != nil {
 					log.Printf("Send Fail!%v", nerr)
