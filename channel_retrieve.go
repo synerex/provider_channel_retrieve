@@ -77,6 +77,8 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 	defer fp.Close()
 
 	scanner := bufio.NewScanner(fp) // csv reader
+	var buf []byte = make([]byte, 1024)
+	scanner.Buffer(buf, 1024*1024*64) // 64Mbytes buffer
 
 	last := time.Now()
 	started := false // start flag
@@ -96,6 +98,8 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 
 		dt := scanner.Text()
 		token := strings.Split(dt, ",")
+		//		log.Printf("dt:%d, token %d", len(dt), len(token))
+
 		//                                    , 0  ,1    ,2          ,3           ,4              ,5            ,6           , 7        ,8
 		//Sprintf("%s,%d,%d,%d,%d,%s,%s,%d,%s", ts, sm.Id, sm.SenderId, sm.TargetId, sm.ChannelType, sm.SupplyName, sm.ArgJson, sm.MbusId, bsd)
 		tm, _ := time.Parse(dateFmt, token[0]) // RFC3339Nano
@@ -159,6 +163,11 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 		if dur.Nanoseconds() < 0 {
 			last = tm
 		}
+	}
+
+	serr := scanner.Err()
+	if serr != nil {
+		log.Printf("Scanner error %v", serr)
 	}
 
 }
