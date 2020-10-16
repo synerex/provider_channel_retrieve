@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"flag"
 	"fmt"
@@ -13,6 +14,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang/protobuf/ptypes"
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 
 	pb "github.com/synerex/synerex_api"
 	sxutil "github.com/synerex/synerex_sxutil"
@@ -35,6 +39,9 @@ var (
 	endTime   = flag.String("endTime", "24:00", "Specify End Time")
 	dir       = flag.String("dir", "store", "Directory of data storage") // for all file
 	all       = flag.Bool("all", true, "Send all file in data storage")  // for all file
+	verbose   = flag.Bool("verbose", false, "Verbose information")
+	jst       = flag.Bool("jst", false, "Run/display with JST Time")
+	recTime   = flag.Bool("recTime", false, "Send with recorded time")
 	speed     = flag.Float64("speed", 1.0, "Speed of sending packets(default real time =1.0), minus in msec")
 	skip      = flag.Int("skip", 0, "Skip lines(default 0)")
 )
@@ -67,6 +74,32 @@ func getMonthDate(dt string) (month int, date int) {
 	return month, date
 }
 
+func NotifySupplyWithTime(clt *sxutil.SXServiceClient, smo *sxutil.SupplyOpts, ts *timestamp.Timestamp) (uint64, error) {
+	id := sxutil.GenerateIntID()
+	dm := pb.Supply{
+		Id:          id,
+		SenderId:    uint64(clt.ClientID),
+		ChannelType: clt.ChannelType,
+		SupplyName:  smo.Name,
+		Ts:          ts,
+		ArgJson:     smo.JSON,
+		Cdata:       smo.Cdata,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	//	resp , err := clt.Client.NotifySupply(ctx, &dm)
+
+	_, err := clt.Client.NotifySupply(ctx, &dm)
+	if err != nil {
+		log.Printf("Error for sending:NotifySupply to Synerex Server as %v ", err)
+		return 0, err
+	}
+	//	log.Println("RegiterSupply:", smo, resp)
+	smo.ID = id // assign ID
+	return id, nil
+}
+
 // sending People Counter File.
 func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 	// file
@@ -86,6 +119,12 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 	edHour, edMin := getHourMin(*endTime)
 	skipCount := 0
 
+	if *verbose {
+		log.Printf("Verbose output for file %s", *sendfile)
+		log.Printf("StartTime %02d:%02d  -- %02d:%02d", stHour, stMin, edHour, edMin)
+	}
+	jstZone := time.FixedZone("Asia/Tokyo", 9*60*60)
+
 	for scanner.Scan() { // read one line.
 		if *skip != 0 { // if there is skip  , do it first
 			skipCount++
@@ -97,12 +136,21 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 		}
 
 		dt := scanner.Text()
+		//		if *verbose {
+		//			log.Printf("Scan:%s", dt)
+		//		}
+
 		token := strings.Split(dt, ",")
 		//		log.Printf("dt:%d, token %d", len(dt), len(token))
 
 		//                                    , 0  ,1    ,2          ,3           ,4              ,5            ,6           , 7        ,8
 		//Sprintf("%s,%d,%d,%d,%d,%s,%s,%d,%s", ts, sm.Id, sm.SenderId, sm.TargetId, sm.ChannelType, sm.SupplyName, sm.ArgJson, sm.MbusId, bsd)
 		tm, _ := time.Parse(dateFmt, token[0]) // RFC3339Nano
+
+		if *jst { // we need to convert UTC to JST.
+			tm = tm.In(jstZone)
+		}
+
 		//		tp, _ := ptypes.TimestampProto(tm)
 		sDec, _ := base64.StdEncoding.DecodeString(token[8])
 
@@ -133,16 +181,19 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 				JSON:  token[6],
 				Cdata: &cont,
 			}
+
+			tsProto, _ := ptypes.TimestampProto(tm)
+
 			// if channel in channels
 			chnum, err := strconv.Atoi(token[4])
 			client, ok := clients[uint32(chnum)]
 			if ok && err == nil { // if there is channel
-				_, nerr := client.NotifySupply(&smo)
+				_, nerr := NotifySupplyWithTime(client, &smo, tsProto)
 				if nerr != nil {
 					log.Printf("Send Fail!%v", nerr)
 				} else {
 					//				log.Printf("Sent OK! %#v\n", smo)
-					log.Printf("ts:%s,chan:%s,%s,%s,%s,len:%d", token[0], token[4], token[5], token[6], token[7], len(token[8]))
+					log.Printf("ts:%s,chan:%s,%s,%s,%s,len:%d", tm.Format(time.RFC3339), token[4], token[5], token[6], token[7], len(token[8]))
 
 				}
 			}
