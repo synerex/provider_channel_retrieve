@@ -145,14 +145,21 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 
 		//                                    , 0  ,1    ,2          ,3           ,4              ,5            ,6           , 7        ,8
 		//Sprintf("%s,%d,%d,%d,%d,%s,%s,%d,%s", ts, sm.Id, sm.SenderId, sm.TargetId, sm.ChannelType, sm.SupplyName, sm.ArgJson, sm.MbusId, bsd)
-		tm, _ := time.Parse(dateFmt, token[0]) // RFC3339Nano
+
+		tm, err := time.Parse(dateFmt, token[0]) // RFC3339Nano
+		if err != nil {
+			log.Printf("Time parsing error with %s, %s : %v", token[0], dt, err)
+		}
 
 		if *jst { // we need to convert UTC to JST.
 			tm = tm.In(jstZone)
 		}
 
 		//		tp, _ := ptypes.TimestampProto(tm)
-		sDec, _ := base64.StdEncoding.DecodeString(token[8])
+		sDec, err2 := base64.StdEncoding.DecodeString(token[8])
+		if err2 != nil {
+			log.Printf("Decoding error with %s : %v", token[8], err)
+		}
 
 		if !started {
 			if (tm.Hour() > stHour || (tm.Hour() == stHour && tm.Minute() >= stMin)) &&
