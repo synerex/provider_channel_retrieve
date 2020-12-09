@@ -90,7 +90,7 @@ func NotifySupplyWithTime(clt *sxutil.SXServiceClient, smo *sxutil.SupplyOpts, t
 	defer cancel()
 	//	resp , err := clt.Client.NotifySupply(ctx, &dm)
 
-	_, err := clt.Client.NotifySupply(ctx, &dm)
+	_, err := clt.SXClient.Client.NotifySupply(ctx, &dm)
 	if err != nil {
 		log.Printf("Error for sending:NotifySupply to Synerex Server as %v ", err)
 		return 0, err
