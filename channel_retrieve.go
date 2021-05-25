@@ -141,6 +141,34 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 		//		}
 
 		token := strings.Split(dt, ",")
+		outx := 0
+
+		if strings.HasPrefix(token[6], "\"") {
+			// token[6] = argJson has comma data..
+			token[6] = token[6][1:]
+			lastToken := ""
+			ix := 6
+			for {
+				if strings.HasSuffix(token[ix], "\"") {
+					lastToken += token[ix][:len(token[ix])-1]
+					break
+				} else {
+					lastToken += token[ix] + ","
+					ix++
+				}
+			}
+			token[6] = lastToken
+			outx = ix
+			log.Printf("dt:%d, token %d  outx: %d, [%s]", len(dt), len(token), outx, lastToken)
+
+			for ix < len(token)-1 {
+				token[ix-outx+7] = token[ix+1]
+				ix++
+			}
+		}
+		log.Printf("dt:%d, token %d  outx: %d", len(dt), len(token), outx)
+
+		// umm if we had a token
 		//		log.Printf("dt:%d, token %d", len(dt), len(token))
 
 		//                                    , 0  ,1    ,2          ,3           ,4              ,5            ,6           , 7        ,8
