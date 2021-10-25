@@ -33,6 +33,8 @@ var (
 	channel   = flag.String("channel", "3", "Retrieving channel type(default 3, support comma separated)")
 	local     = flag.String("local", "", "Specify Local Synerex Server")
 	sendfile  = flag.String("sendfile", "", "Sending file name") // only one file
+	startYear = flag.String("startYear", "2021", "Specify Start Year")
+	endYear   = flag.String("endYear", "2021", "Specify End Year")
 	startDate = flag.String("startDate", "02-07", "Specify Start Date")
 	endDate   = flag.String("endDate", "12-31", "Specify End Date")
 	startTime = flag.String("startTime", "00:00", "Specify Start Time")
@@ -115,7 +117,11 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 
 	last := time.Now()
 	started := false // start flag
+	stYear, _ := strconv.Atoi(*startYear)
+	stMonth, stDate := getMonthDate(*startDate)
 	stHour, stMin := getHourMin(*startTime)
+	edYear, _ := strconv.Atoi(*endYear)
+	edMonth, edDate := getMonthDate((*endDate))
 	edHour, edMin := getHourMin(*endTime)
 	skipCount := 0
 
@@ -136,9 +142,9 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 		}
 
 		dt := scanner.Text()
-		//		if *verbose {
-		//			log.Printf("Scan:%s", dt)
-		//		}
+		// if *verbose {
+		// 	log.Printf("Scan:%s", dt)
+		// }
 
 		token := strings.Split(dt, ",")
 		outx := 0
@@ -173,7 +179,7 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 
 		//                                    , 0  ,1    ,2          ,3           ,4              ,5            ,6           , 7        ,8
 		//Sprintf("%s,%d,%d,%d,%d,%s,%s,%d,%s", ts, sm.Id, sm.SenderId, sm.TargetId, sm.ChannelType, sm.SupplyName, sm.ArgJson, sm.MbusId, bsd)
-
+		// log.Printf("token[0] : %s", token[0])
 		tm, err := time.Parse(dateFmt, token[0]) // RFC3339Nano
 		if err != nil {
 			log.Printf("Time parsing error with %s, %s : %v", token[0], dt, err)
@@ -189,16 +195,18 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 			log.Printf("Decoding error with %s : %v", token[8], err)
 		}
 
+		stTime := time.Date(stYear, time.Month(stMonth), stDate, stHour, stMin, 0, 000000000, time.Local)
+		edTime := time.Date(edYear, time.Month(edMonth), edDate, edHour, edMin, 0, 000000000, time.Local)
 		if !started {
-			if (tm.Hour() > stHour || (tm.Hour() == stHour && tm.Minute() >= stMin)) &&
-				(tm.Hour() < edHour || (tm.Hour() == edHour && tm.Minute() <= edMin)) {
+			if tm.After(stTime) && tm.Before(edTime) {
 				started = true
 				log.Printf("Start output! %v", tm)
+				time.Sleep(time.Second * 1)
 			} else {
 				continue // skip all data
 			}
 		} else {
-			if tm.Hour() > edHour || (tm.Hour() == edHour && tm.Minute() > edMin) {
+			if tm.After(edTime) {
 				started = false
 				log.Printf("Stop  output! %v", tm)
 				continue
@@ -260,6 +268,8 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 
 func sendAllStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 	// check all files in dir.
+	stYear, _ := strconv.Atoi(*startYear)
+	edYear, _ := strconv.Atoi(*endYear)
 	stMonth, stDate := getMonthDate(*startDate)
 	edMonth, edDate := getMonthDate(*endDate)
 
@@ -268,6 +278,9 @@ func sendAllStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 		data := "data"
 		dir = &data
 	}
+
+	log.Printf("directory name : %s", dir)
+
 	files, err := ioutil.ReadDir(*dir)
 
 	if err != nil {
@@ -279,12 +292,13 @@ func sendAllStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".csv") { // check is CSV file
-			//
 			fn := file.Name()
 			var year, month, date int
 			ct, err := fmt.Sscanf(fn, "%4d-%02d-%02d.csv", &year, &month, &date)
-			if (month > stMonth || (month == stMonth && date >= stDate)) &&
-				(month < edMonth || (month == edMonth && date <= edDate)) {
+			stTime := time.Date(stYear, time.Month(stMonth), stDate, 0, 0, 0, 000000000, time.Local)
+			edTime := time.Date(edYear, time.Month(edMonth), edDate, 23, 59, 59, 999999999, time.Local)
+			csvFileTime := time.Date(year, time.Month(month), date, 12, 0, 0, 000000000, time.Local)
+			if csvFileTime.After(stTime) && csvFileTime.Before(edTime) {
 				ss = append(ss, file.Name())
 			} else {
 				log.Printf("file: %d %v %s: %04d-%02d-%02d", ct, err, fn, year, month, date)
