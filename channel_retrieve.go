@@ -33,9 +33,9 @@ var (
 	channel   = flag.String("channel", "3", "Retrieving channel type(default 3, support comma separated)")
 	local     = flag.String("local", "", "Specify Local Synerex Server")
 	sendfile  = flag.String("sendfile", "", "Sending file name") // only one file
-	startYear = flag.String("startYear", "2021", "Specify Start Year")
-	endYear   = flag.String("endYear", "2021", "Specify End Year")
-	startDate = flag.String("startDate", "02-07", "Specify Start Date")
+	startYear = flag.String("startYear", "2022", "Specify Start Year")
+	endYear   = flag.String("endYear", "2022", "Specify End Year")
+	startDate = flag.String("startDate", "01-01", "Specify Start Date")
 	endDate   = flag.String("endDate", "12-31", "Specify End Date")
 	startTime = flag.String("startTime", "00:00", "Specify Start Time")
 	endTime   = flag.String("endTime", "24:00", "Specify End Time")
@@ -165,14 +165,14 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 			}
 			token[6] = lastToken
 			outx = ix
-			log.Printf("dt:%d, token %d  outx: %d, [%s]", len(dt), len(token), outx, lastToken)
+			log.Printf("dt1:%d, token %d  outx: %d, [%s]", len(dt), len(token), outx, lastToken)
 
 			for ix < len(token)-1 {
 				token[ix-outx+7] = token[ix+1]
 				ix++
 			}
 		}
-		log.Printf("dt:%d, token %d  outx: %d", len(dt), len(token), outx)
+//		log.Printf("dt0:%d, token %d  outx: %d", len(dt), len(token), outx)
 
 		// umm if we had a token
 		//		log.Printf("dt:%d, token %d", len(dt), len(token))
@@ -190,9 +190,15 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 		}
 
 		//		tp, _ := ptypes.TimestampProto(tm)
+
+
 		sDec, err2 := base64.StdEncoding.DecodeString(token[8])
-		if err2 != nil {
-			log.Printf("Decoding error with %s : %v", token[8], err)
+		if token[8] != "\"\""  {
+		
+		   if err2 != nil {
+		   	log.Print(sDec,"::",token[7],"::",token[8],"::",token[9])
+			log.Printf("Decoding error with %s : %v", token[8], err2)
+		   }
 		}
 
 		stTime := time.Date(stYear, time.Month(stMonth), stDate, stHour, stMin, 0, 000000000, time.Local)
@@ -212,8 +218,10 @@ func sendingStoredFile(clients map[uint32]*sxutil.SXServiceClient) {
 				continue
 			}
 		}
+		
 
 		if !started {
+		   	  log.Printf("Not start")
 			continue // skip following
 		}
 
